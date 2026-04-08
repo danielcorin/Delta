@@ -23,7 +23,7 @@ const config: ForgeConfig = {
     onlyModules: ["better-sqlite3", "sqlite-vec", "sqlite-vec-darwin-arm64"],
     force: true,
     platform: process.platform,
-    buildFromSource: true,
+    buildFromSource: false,
   },
   makers: [
     new MakerSquirrel({}),
