@@ -48,7 +48,7 @@ export function setupChatHandler() {
                 const attachments = await handleAttachments(messages);
 
                 const result = streamText({
-                    model: getProvider(model)(model),
+                    model: getProvider(model),
                     temperature,
                     topP,
                     experimental_transform: smoothStream(),
@@ -125,18 +125,24 @@ function extractParentId(messages: Message[]): string | null {
 }
 
 function formatMessages(messages: Message[]) {
-    return messages.map((message) => ({
+    return messages.map(formatMessage);
+}
+
+function formatMessage(message: Message) {
+    const content = message.experimental_attachments?.length > 0
+        ? [
+            { type: "text", text: message.content },
+            ...message.experimental_attachments.map((attachment) => ({
+                type: "image",
+                image: attachment.url,
+            })),
+        ]
+        : [{ type: "text", text: message.content }];
+
+    return {
         role: message.role,
-        content: message.experimental_attachments?.length > 0
-            ? [
-                { type: "text", text: message.content },
-                ...message.experimental_attachments.map((attachment) => ({
-                    type: "image",
-                    image: attachment.url,
-                })),
-            ]
-            : message.content,
-    }));
+        content,
+    };
 }
 
 async function handleAttachments(

@@ -5,10 +5,13 @@ import { anthropic, createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI, openai } from "@ai-sdk/openai";
 import { apiKeys, DEFAULT_OLLAMA_URL } from "./settings";
 
-const getAnthropicProvider = () =>
-    apiKeys.get("anthropic")
-        ? createAnthropic({ apiKey: apiKeys.get("anthropic") })
+const getAnthropicProvider = () => {
+    const key = apiKeys.get("anthropic");
+    console.log("[Models] Anthropic API key status:", key ? "Present" : "Missing");
+    return key
+        ? createAnthropic({ apiKey: key })
         : anthropic;
+};
 
 const getGoogleProvider = () =>
     apiKeys.get("google")
@@ -69,19 +72,13 @@ const baseModelProviders = {
         providerName: "google",
     },
 
-    "claude-3-5-sonnet-20240620": {
+    "claude-4-sonnet-20250514": {
         get provider() {
             return getAnthropicProvider();
         },
         providerName: "anthropic",
     },
-    "claude-3-5-sonnet-20241022": {
-        get provider() {
-            return getAnthropicProvider();
-        },
-        providerName: "anthropic",
-    },
-    "claude-3-5-haiku-20241022": {
+    "claude-4-opus-20250514": {
         get provider() {
             return getAnthropicProvider();
         },
@@ -128,7 +125,32 @@ export type SupportedModel = keyof typeof baseModelProviders;
 
 export function getProvider(model: string) {
     if (model in modelProviders) {
-        return modelProviders[model as SupportedModel].provider;
+        try {
+            const providerConfig = modelProviders[model as SupportedModel];
+            const provider = providerConfig.provider;
+            console.log(`[Models] Getting provider for model: ${model}, provider type: ${typeof provider}`);
+
+            if (typeof provider === "function") {
+                return provider(model);
+            }
+
+            if (typeof provider === "object") {
+                if (typeof (provider as any).messages === "function") {
+                    return (provider as any).messages(model);
+                }
+                if (typeof (provider as any).chat === "function") {
+                    return (provider as any).chat(model);
+                }
+                if (typeof (provider as any).languageModel === "function") {
+                    return (provider as any).languageModel(model);
+                }
+            }
+
+            return provider as any;
+        } catch (error) {
+            console.error(`[Models] Error getting provider for ${model}:`, error);
+            throw error;
+        }
     }
     throw new Error(`Unsupported model: ${model}`);
 }
