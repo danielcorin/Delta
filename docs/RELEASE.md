@@ -4,7 +4,7 @@
 
 Requirements: macOS, mise, Xcode Command Line Tools, GitHub CLI authentication, a Developer ID Application certificate with private key, and a notarytool Keychain profile.
 
-The maintainer's signing identity is `Developer ID Application: wvlen LLC (93W5N4LQL7)`. The script reuses the verified `RecoNotary` Keychain profile. Notarization profiles belong to an Apple account/team, not an individual app. Override with `DEVELOPER_IDENTITY` and `NOTARY_PROFILE`. The profile name is configuration, not a credential. Use `xcrun notarytool store-credentials <profile>` interactively if setting up another machine. Never put passwords or exported signing keys in this repository.
+The maintainer's signing identity is `Developer ID Application: wvlen LLC (93W5N4LQL7)`. The script uses the verified `DeltaNotary` Keychain profile. Notarization profiles belong to an Apple account/team, not an individual app. Override with `DEVELOPER_IDENTITY` and `NOTARY_PROFILE`. The profile name is configuration, not a credential. Use `xcrun notarytool store-credentials <profile>` interactively if setting up another machine. Never put passwords or exported signing keys in this repository.
 
 1. Update package.json's version, package-lock.json and `docs/releases/<version>.md`.
 2. Commit the finished release changes. The working tree must be clean.
