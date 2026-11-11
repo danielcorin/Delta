@@ -100,3 +100,9 @@ dist/
 
 # local test dbs
 *.db
+*.db-wal
+*.db-shm
+test-results/
+playwright-report/
+.env.*
+release/

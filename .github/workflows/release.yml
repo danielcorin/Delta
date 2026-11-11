@@ -1,0 +1,33 @@
+name: Draft macOS Release
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit or tag to build
+        required: true
+        default: main
+permissions:
+  contents: write
+concurrency:
+  group: delta-release
+  cancel-in-progress: false
+jobs:
+  draft:
+    # Uses the same Keychain-backed signing environment as the local release.
+    # Register a dedicated macOS runner with these labels; never expose it to PRs.
+    runs-on: [self-hosted, macOS, ARM64, delta-release]
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - name: Build, verify, and notarize
+        run: |
+          mise trust
+          mise exec -- npm ci
+          mise exec -- npm run release -- --prepare
+      - name: Upload private draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: mise exec -- npm run release -- --draft

@@ -1,8 +1,8 @@
 import knex from "knex";
-import { getEmbeddingProvider } from "./models";
+import { getEmbeddings } from "./models";
 import { deleteAttachment, getAttachment } from "./storage";
 import { app } from "electron";
-import { join } from "path";
+import { join, dirname } from "node:path";
 import { getConfig } from "../../knexfile";
 
 import {
@@ -18,10 +18,10 @@ import {
 const filename = join(app.getPath("userData"), "delta_data", "delta.db");
 console.log(`Using database at ${filename}`);
 
-const config = getConfig(filename);
+const config = getConfig(filename, app.getAppPath().endsWith(".asar") ? join(dirname(app.getAppPath()), "migrations") : join(app.getAppPath(), "src/main/migrations"));
 
 export const db: knex.Knex = knex(config);
-db.raw("PRAGMA journal_mode = WAL");
+
 
 export async function ensureTables(): Promise<void> {
     try {
@@ -133,12 +133,21 @@ export async function deleteResponse(
     conversationId: string,
     responseId: string,
 ): Promise<void> {
-    await db("responses")
-        .where({
-            id: responseId,
-            conversation_id: conversationId,
-        })
-        .delete();
+    const files: string[] = [];
+    await db.transaction(async trx => {
+        const rows = await trx.raw(`
+          WITH RECURSIVE subtree(id) AS (
+            SELECT id FROM responses WHERE id = ? AND conversation_id = ?
+            UNION SELECT r.id FROM responses r JOIN subtree s ON r.parent_id = s.id WHERE r.conversation_id = ?
+          ) SELECT id FROM subtree
+        `, [responseId, conversationId, conversationId]) as { id: string }[];
+        const ids = rows.map(r => r.id);
+        const attachments = await trx("attachments").whereIn("response_id", ids).select("file_path");
+        files.push(...attachments.map(a => a.file_path as string));
+        for (const table of ["summaries", "embeddings", "attachments"]) await trx(table).whereIn("response_id", ids).delete();
+        await trx("responses").whereIn("id", ids).delete();
+    });
+    await Promise.all(files.map(file => deleteAttachment(file).catch(() => undefined)));
 }
 
 export async function deleteConversation(
@@ -154,16 +163,7 @@ export async function deleteConversation(
                     .where("conversation_id", conversationId),
             );
 
-        for (const attachment of attachments) {
-            try {
-                await deleteAttachment(attachment.file_path);
-            } catch (error) {
-                console.error(
-                    `Failed to delete attachment ${attachment.file_path}:`,
-                    error,
-                );
-            }
-        }
+        await trx("summaries").where("conversation_id", conversationId).delete();
 
         await trx("embeddings")
             .whereIn(
@@ -190,6 +190,8 @@ export async function deleteConversation(
         await trx("conversations")
             .where("id", conversationId)
             .delete();
+        // Only remove files once the transaction has committed.
+        trx.executionPromise.then(() => Promise.all(attachments.map(a => deleteAttachment(a.file_path).catch(() => undefined)))).catch(() => undefined);
     });
 }
 
@@ -199,18 +201,16 @@ export async function findSimilarResponses(
     offset = 0,
     searchType: "vector" | "text" | "combined" = "combined",
 ): Promise<SimilarResponse[]> {
+    if (!query.trim()) return [];
+    limit = Math.max(1, Math.min(100, Math.floor(limit)));
+    offset = Math.max(0, Math.floor(offset));
     let vectorResults: SimilarResponse[] = [];
     let ftsResults: SimilarResponse[] = [];
 
     if (searchType === "vector" || searchType === "combined") {
-        const sanitizedQuery = query.replace(/[^\w\s]/g, "").trim();
-        const embeddingProvider = getEmbeddingProvider("nomic-embed-text");
-        const embeddingsRes = await embeddingProvider.doEmbed({
-            values: [sanitizedQuery],
-        });
-        const queryEmbedding = Buffer.from(
-            new Float32Array(embeddingsRes.embeddings[0]).buffer,
-        );
+      try {
+        const embeddings = await getEmbeddings([query]);
+        const queryEmbedding = Buffer.from(new Float32Array(embeddings[0]).buffer);
 
         vectorResults = await db.raw(
             `
@@ -222,17 +222,22 @@ export async function findSimilarResponses(
                     vec_distance_cosine(e.embedding, ?) as distance
                 FROM embeddings e
                 JOIN responses r ON e.response_id = r.id
+                WHERE e.embedding_model = 'nomic-embed-text' AND length(e.embedding) = length(?)
                 ORDER BY distance
                 LIMIT ?
             )
             SELECT * FROM vector_matches
         `,
-            [queryEmbedding, limit * 2],
+            [queryEmbedding, queryEmbedding, (offset + limit) * 2],
         );
+      } catch (error) {
+        if (searchType === "vector") throw error;
+        // Combined search still provides useful text results without Ollama.
+      }
     }
 
     if (searchType === "text" || searchType === "combined") {
-        const sanitizedQuery = query.replace(/[^\w\s]/g, "").trim();
+        const sanitizedQuery = query.trim().split(/\s+/u).map(token => '"' + token.replace(/"/g, '""') + '"').join(" AND ");
         ftsResults = await db.raw(
             `
             WITH fts_matches AS (
@@ -256,23 +261,14 @@ export async function findSimilarResponses(
             )
             SELECT * FROM fts_matches
         `,
-            [sanitizedQuery, sanitizedQuery, sanitizedQuery, limit * 2],
+            [query, query, sanitizedQuery, (offset + limit) * 2],
         );
     }
 
     if (searchType === "combined") {
-        const maxVectorDist = Math.max(
-            ...vectorResults.map((r) => r.distance),
-            1,
-        );
-        const maxFtsDist = Math.max(...ftsResults.map((r) => r.distance), 1);
-
-        vectorResults.forEach((r) => {
-            r.distance /= maxVectorDist;
-        });
-        ftsResults.forEach((r) => {
-            r.distance /= maxFtsDist;
-        });
+        // Rank fusion: BM25 and cosine distance do not share a numeric scale.
+        vectorResults.forEach((r, i) => { r.distance = i / Math.max(1, vectorResults.length); });
+        ftsResults.forEach((r, i) => { r.distance = i / Math.max(1, ftsResults.length); });
     }
 
     const seenIds = new Set<string>();

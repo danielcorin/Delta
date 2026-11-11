@@ -1,0 +1,37 @@
+name: Check and Package
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm audit --audit-level=moderate
+      - run: npm run package -- --platform=darwin
+      - run: npm run test:app
+      - run: npm run test:package
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-verification-${{ matrix.runner }}
+          path: test-results/
+      - run: ditto -c -k --keepParent out/Delta-darwin-*/Delta.app Delta-unsigned.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Delta-unsigned-${{ matrix.runner }}
+          path: Delta-unsigned.zip

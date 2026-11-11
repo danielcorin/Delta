@@ -1,0 +1,5 @@
+[tools]
+node = "24.22.1"
+
+[tasks.check]
+run = "npm run check"

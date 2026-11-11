@@ -1,96 +1,25 @@
-import path from "path";
-import fs from "fs";
-import { app, ipcMain } from "electron";
+import path from "node:path";
+import os from "node:os";
+import { app, safeStorage } from "electron";
+import { ipcMain } from "./ipc";
+import { SettingsStore } from "./settings-store";
+import type { Settings } from "../shared/contracts";
 
-type Provider = "openai" | "anthropic" | "google" | "ollama";
-
-interface ApiKeys {
-    openAI?: string;
-    anthropic?: string;
-    google?: string;
-    ollamaUrl?: string;
-    [key: string]: string | undefined;
-}
-
-export const PROVIDERS: Provider[] = [
-    "openai",
-    "anthropic",
-    "google",
-    "ollama",
-];
-export const DEFAULT_OLLAMA_URL = "http://localhost:11434";
-
-const KEYS_FILE = path.join(
-    app.getPath("userData"),
-    "delta_data",
-    "config.json",
-);
-
-function loadKeys(): Record<string, string> {
-    if (fs.existsSync(KEYS_FILE)) {
-        return JSON.parse(fs.readFileSync(KEYS_FILE, "utf8"));
-    }
-    fs.writeFileSync(KEYS_FILE, JSON.stringify({}));
-    return {};
-}
-
-function saveKeys(data: Record<string, string>) {
-    fs.writeFileSync(KEYS_FILE, JSON.stringify(data));
-}
-
-export const apiKeys = {
-    set: (key: keyof ApiKeys, value: string) => {
-        const data = loadKeys();
-        data[key.toString()] = value;
-        saveKeys(data);
+let store: SettingsStore;
+export function initializeSettings() {
+  const configDir = process.env.DELTA_HOME ? path.join(process.env.DELTA_HOME, "config") : path.join(os.homedir(), ".config", "delta");
+  store = new SettingsStore(path.join(configDir, "config.json"), path.join(app.getPath("userData"), "credentials.enc"), {
+    encryptString(value) {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error("Unlock your login Keychain to save API keys.");
+      return safeStorage.encryptString(value);
     },
-    get: (key: keyof ApiKeys) => {
-        const data = loadKeys();
-        return data[key.toString()];
-    },
-    delete: (key: keyof ApiKeys) => {
-        const data = loadKeys();
-        delete data[key.toString()];
-        saveKeys(data);
-    },
-};
-
-function getSettingsHandler(_event: any) {
-    try {
-        const data = loadKeys();
-        const providers = PROVIDERS.map((name) => ({
-            name,
-            apiKey: data[name] || "",
-        }));
-        return { providers };
-    } catch (error) {
-        console.error("Error loading settings:", error);
-        return { providers: PROVIDERS.map((name) => ({ name, apiKey: "" })) };
-    }
+    decryptString: value => safeStorage.decryptString(value),
+  });
+  store.migrate(path.join(app.getPath("userData"), "delta_data", "config.json"));
 }
-
-async function saveSettingsHandler(
-    _event: any,
-    settings: { providers: { name: string; apiKey: string }[] },
-) {
-    try {
-        const data = loadKeys();
-        settings.providers.forEach(({ name, apiKey }) => {
-            if (apiKey) {
-                data[name] = apiKey;
-            } else {
-                delete data[name];
-            }
-        });
-        saveKeys(data);
-        return true;
-    } catch (error) {
-        console.error("Main: Error saving settings:", error);
-        throw error;
-    }
-}
-
+export const getSettings = () => store.get();
+export const getAPIKey = (name: string) => store.key(name);
 export function setupSettingsHandlers() {
-    ipcMain.handle("settings:get", getSettingsHandler);
-    ipcMain.handle("settings:save", saveSettingsHandler);
+  ipcMain.handle("settings:get", () => store.get());
+  ipcMain.handle("settings:save", (_event, settings: Settings) => { store.save(settings); return true; });
 }

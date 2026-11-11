@@ -1,218 +1,75 @@
-import { useCallback, useEffect, useState } from "react";
-import type { ChatRequestOptions, CreateMessage, Message } from "ai";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Message } from "../../shared/contracts";
 import { parseBase64ToAttachment } from "../services/attachment";
 
 interface UseChatOptions {
-    body?: Record<string, any>;
-    onFinish?: (message: Message) => void;
+  body: { conversationId?: string; model: string; temperature: number; topP: number; systemPrompt: string; attachments: string[] };
+  onFinish?: (message: Message) => void;
 }
 export function useChat({ body, onFinish }: UseChatOptions) {
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [input, setInput] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<Error>();
-
-    const handleStreamData = useCallback(
-        (data: { value: string; timestamp: number }) => {
-            setMessages((prevMessages) => {
-                const lastMessage = prevMessages[prevMessages.length - 1];
-                if (lastMessage?.role === "assistant") {
-                    return [
-                        ...prevMessages.slice(0, -1),
-                        {
-                            ...lastMessage,
-                            content: lastMessage.content + data.value,
-                            annotations: lastMessage.annotations,
-                        },
-                    ];
-                }
-                return [
-                    ...prevMessages,
-                    {
-                        id: data.timestamp.toString(),
-                        role: "assistant",
-                        content: data.value,
-                    },
-                ];
-            });
-        },
-        [],
-    );
-
-    const handleStreamComplete = useCallback((message: Message) => {
-        setIsLoading(false);
-        setMessages((prevMessages) => {
-            const lastMessage = prevMessages[prevMessages.length - 1];
-            if (message?.role === "assistant" && onFinish) {
-                onFinish(message);
-
-                const lastTwoMessages = [
-                    prevMessages[prevMessages.length - 1],
-                    message,
-                ].filter(Boolean);
-
-                const responseId = message.annotations?.find((a: any) =>
-                    a.field === "responseId"
-                )?.id;
-                const conversationId = message.annotations?.find((a: any) =>
-                    a.field === "conversationId"
-                )?.id;
-                if (lastTwoMessages.length === 2) {
-                    // TODO: enable when ready to store summaries
-                    // window.api.generateSummary(
-                    //     lastTwoMessages,
-                    //     body?.model,
-                    //     responseId,
-                    //     conversationId,
-                    // );
-                }
-            }
-            if (lastMessage?.role === "assistant") {
-                return [
-                    ...prevMessages.slice(0, -1),
-                    message,
-                ];
-            }
-            return [...prevMessages, message];
-        });
-    }, [body?.model, body?.conversationId, onFinish]);
-
-    const handleStreamError = useCallback((err: Error) => {
-        setError(err);
-        setIsLoading(false);
-    }, []);
-
-    const handleInputChange = useCallback((
-        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    ) => {
-        setInput(e.target.value);
-    }, []);
-
-    const append = useCallback(
-        async (message: Message | CreateMessage) => {
-            try {
-                setError(undefined);
-                setIsLoading(true);
-                const messageWithAnnotations = {
-                    ...message,
-                    annotations: (message as Message).annotations || [],
-                } as Message;
-                const newMessages = [...messages, messageWithAnnotations];
-                setMessages(newMessages);
-                window.api.startStream({
-                    messages: newMessages,
-                    model: body?.model,
-                    temperature: body?.temperature,
-                    topP: body?.topP,
-                    systemPrompt: body?.systemPrompt,
-                });
-                return message.content;
-            } catch (err) {
-                setError(err as Error);
-                setIsLoading(false);
-                return null;
-            }
-        },
-        [
-            body?.model,
-            body?.temperature,
-            body?.topP,
-            body?.systemPrompt,
-            body?.droppedImages,
-            messages,
-        ],
-    );
-
-    const reload = useCallback(
-        async (
-            newMessages?: Message[],
-            chatRequestOptions?: ChatRequestOptions,
-        ) => {
-            try {
-                const currentMessages = newMessages || messages;
-                const lastMessage = currentMessages[currentMessages.length - 1];
-
-                if (!lastMessage || lastMessage.role === "assistant") {
-                    return null;
-                }
-                setError(undefined);
-                setIsLoading(true);
-
-                window.api.startStream({
-                    messages: currentMessages,
-                    model: body?.model,
-                    temperature: body?.temperature,
-                    topP: body?.topP,
-                    systemPrompt: body?.systemPrompt,
-                });
-                return lastMessage.content;
-            } catch (err) {
-                console.error("[useChat] Error during reload:", err);
-                setError(err as Error);
-                setIsLoading(false);
-                return null;
-            }
-        },
-        [
-            body?.model,
-            body?.temperature,
-            body?.topP,
-            body?.systemPrompt,
-            body?.droppedImages,
-            messages,
-        ],
-    );
-
-    const handleSubmit = useCallback(
-        async (
-            e?: { preventDefault: () => void },
-        ) => {
-            e?.preventDefault();
-            if (!input.trim() || isLoading) return;
-            const newMessage: Message = {
-                id: Date.now().toString(),
-                role: "user",
-                content: input,
-                annotations: messages[messages.length - 1]?.annotations || [],
-                experimental_attachments: body?.attachments.map((
-                    image: string,
-                ) => (parseBase64ToAttachment(image))),
-            };
-
-            setInput("");
-            await append(newMessage);
-        },
-        [input, isLoading, append, messages, body?.attachments],
-    );
-
-    const stop = useCallback(() => {
-        setIsLoading(false);
-    }, []);
-
-    useEffect(() => {
-        const streamDataHandler = window.api.onStreamData(handleStreamData);
-        const streamCompleteHandler = window.api.onStreamComplete(
-            handleStreamComplete,
-        );
-        const streamErrorHandler = window.api.onStreamError(handleStreamError);
-
-        return () => {
-            window.api.removeStreamDataListener(streamDataHandler);
-            window.api.removeStreamCompleteListener(streamCompleteHandler);
-            window.api.removeStreamErrorListener(streamErrorHandler);
-        };
-    }, [handleStreamData, handleStreamComplete, handleStreamError]);
-
-    return {
-        messages,
-        input,
-        handleInputChange,
-        handleSubmit,
-        setMessages,
-        reload,
-        error,
-        append,
-        stop,
-        isLoading,
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState(() => localStorage.getItem("delta.draft") || "");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error>();
+  const active = useRef<string | null>(null);
+  const finish = useRef(onFinish);
+  finish.current = onFinish;
+  useEffect(() => { localStorage.setItem("delta.draft", input); }, [input]);
+  useEffect(() => {
+    const offData = window.api.onStreamData(({ requestId, value }) => {
+      if (active.current !== requestId) return;
+      setMessages(prev => {
+        const last = prev.at(-1);
+        if (last?.role === "assistant") return [...prev.slice(0, -1), { ...last, content: last.content + value }];
+        return [...prev, { id: requestId, role: "assistant", content: value }];
+      });
+    });
+    const offComplete = window.api.onStreamComplete(({ requestId, message }) => {
+      if (active.current !== requestId) return;
+      setIsLoading(false);
+      setMessages(prev => {
+        const chain = prev.at(-1)?.role === "assistant" ? prev.slice(0, -1) : [...prev];
+        if (chain.at(-1)?.role === "user") chain[chain.length - 1] = { ...chain.at(-1)!, annotations: message.annotations };
+        return [...chain, message];
+      });
+      finish.current?.(message);
+    });
+    const offError = window.api.onStreamError(({ requestId, message }) => {
+      if (active.current !== requestId) return;
+      setError(new Error(message)); setIsLoading(false);
+    });
+    return () => {
+      if (active.current) window.api.stopStream(active.current);
+      offData(); offComplete(); offError();
     };
+  }, []);
+  const reload = useCallback(async (next?: Message[]) => {
+    if (isLoading) return null;
+    const chain = next || messages;
+    if (!chain.length || chain.at(-1)?.role !== "user") return null;
+    const requestId = crypto.randomUUID();
+    active.current = requestId;
+    setError(undefined); setIsLoading(true); setMessages(chain);
+    window.api.startStream({ ...body, messages: chain, requestId });
+    return chain.at(-1)!.content;
+  }, [body, messages, isLoading]);
+  const handleSubmit = useCallback(async (event?: { preventDefault(): void }) => {
+    event?.preventDefault();
+    if (!input.trim() || isLoading || !body.model) return;
+    const message: Message = {
+      id: crypto.randomUUID(), role: "user", content: input,
+      annotations: messages.at(-1)?.annotations || [],
+      experimental_attachments: body.attachments.map(parseBase64ToAttachment),
+    };
+    setInput("");
+    await reload([...messages, message]);
+  }, [input, isLoading, body, messages, reload]);
+  const stop = useCallback(() => { if (active.current) window.api.stopStream(active.current); }, []);
+  const retry = useCallback(() => {
+    const chain = messages.at(-1)?.role === "assistant" ? messages.slice(0, -1) : messages;
+    return reload(chain);
+  }, [messages, reload]);
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setInput(e.target.value), []);
+  const replaceMessages = useCallback((next: Message[]) => { active.current = null; setMessages(next); setError(undefined); }, []);
+  return { messages, input, handleInputChange, handleSubmit, setMessages: replaceMessages, reload, retry, error, stop, isLoading };
 }

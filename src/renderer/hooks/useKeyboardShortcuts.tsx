@@ -1,34 +1,15 @@
-import { useHotkeys } from 'react-hotkeys-hook';
-
-interface UseKeyboardShortcutsProps {
-    setSidebarOpen: (value: boolean | ((prev: boolean) => boolean)) => void;
-    setIsFullScreen: (value: 'flow' | 'chat' | 'none' | ((prev: string) => string)) => void;
-    handleNewConversation: (focusCallback?: () => void) => void;
-    focusChatTextArea: () => void;
-    setIsConfigModalOpen: (value: boolean | ((prev: boolean) => boolean)) => void;
-}
-
-export function useKeyboardShortcuts({
-    setSidebarOpen,
-    setIsFullScreen,
-    handleNewConversation,
-    focusChatTextArea,
-    setIsConfigModalOpen,
-}: UseKeyboardShortcutsProps) {
-    useHotkeys('alt+s', () => setSidebarOpen(prev => !prev), []);
-    useHotkeys('alt+f', () => {
-        setIsFullScreen(prev => prev === 'flow' ? 'none' : 'flow');
-    }, []);
-    useHotkeys('alt+c', () => {
-        setIsFullScreen(prev => prev === 'chat' ? 'none' : 'chat');
-    }, []);
-    useHotkeys('alt+n', (e) => {
-        e.preventDefault();
-        handleNewConversation();
-    }, { preventDefault: true });
-    useHotkeys('alt+l', (e) => {
-        e.preventDefault();
-        focusChatTextArea();
-    }, { preventDefault: true });
-    useHotkeys('alt+e', () => setIsConfigModalOpen(prev => !prev), []);
+import { useEffect } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
+import type { defaultShortcuts } from "../../shared/contracts";
+type Actions = Record<keyof typeof defaultShortcuts, () => void>;
+export function useKeyboardShortcuts(shortcuts: Record<keyof typeof defaultShortcuts, string>, actions: Actions) {
+  const options = { preventDefault: true, enableOnFormTags: true };
+  useHotkeys(shortcuts.sidebar, actions.sidebar, options, [actions]);
+  useHotkeys(shortcuts.canvas, actions.canvas, options, [actions]);
+  useHotkeys(shortcuts.chat, actions.chat, options, [actions]);
+  useHotkeys(shortcuts.newConversation, actions.newConversation, options, [actions]);
+  useHotkeys(shortcuts.composer, actions.composer, options, [actions]);
+  useHotkeys(shortcuts.settings, actions.settings, options, [actions]);
+  useHotkeys(shortcuts.search, actions.search, options, [actions]);
+  useEffect(() => window.api.onMenu(action => actions[action as keyof Actions]?.()), [actions]);
 }

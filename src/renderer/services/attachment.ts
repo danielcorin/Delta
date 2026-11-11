@@ -1,4 +1,4 @@
-import { Attachment } from "ai";
+import type { Attachment } from "../../shared/contracts";
 
 export function parseBase64ToAttachment(base64String: string): Attachment {
     const matches = base64String.match(/^data:([^;]+);base64,(.+)$/);
@@ -7,7 +7,7 @@ export function parseBase64ToAttachment(base64String: string): Attachment {
         throw new Error("Invalid base64 string format");
     }
 
-    const [, contentType, base64Data] = matches;
+    const [, contentType] = matches;
 
     return {
         contentType,

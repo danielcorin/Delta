@@ -1,16 +1,9 @@
 {
   "compilerOptions": {
-    "jsx": "react",
-    "target": "ESNext",
-    "module": "commonjs",
-    "allowJs": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "noImplicitAny": true,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "outDir": "dist",
-    "moduleResolution": "node",
-    "resolveJsonModule": true
-  }
+    "jsx": "react-jsx", "target": "ES2023", "module": "ESNext",
+    "skipLibCheck": true, "esModuleInterop": true, "strict": true,
+    "sourceMap": true, "baseUrl": ".", "moduleResolution": "bundler",
+    "resolveJsonModule": true, "noEmit": true, "types": ["node", "vite/client"]
+  },
+  "include": ["src", "*.ts", "tests"]
 }

@@ -1,7 +1,7 @@
-import { Attachment } from "ai";
+import type { Attachment } from "../shared/contracts";
 import { app } from "electron";
 import { mkdir, writeFile } from "fs/promises";
-import { join } from "path";
+import { join, resolve, sep } from "node:path";
 import { ulid } from "ulid";
 
 const DELTA_DATA_DIR = join(app.getPath("userData"), "delta_data");
@@ -14,11 +14,7 @@ export interface StoredAttachment {
 }
 
 export async function initAttachmentStorage() {
-    try {
-        await mkdir(ATTACHMENTS_DIR, { recursive: true });
-    } catch (error) {
-        console.error("Failed to create attachments directory:", error);
-    }
+    await mkdir(ATTACHMENTS_DIR, { recursive: true, mode: 0o700 });
 }
 
 export async function storeAttachment(
@@ -37,7 +33,8 @@ export async function storeAttachment(
     const filePath = join("attachments", attachmentId);
     const fullPath = join(ATTACHMENTS_DIR, attachmentId);
 
-    await writeFile(fullPath, buffer);
+    if (buffer.length > 10 * 1024 * 1024) throw new Error("Images must be smaller than 10 MB.");
+    await writeFile(fullPath, buffer, { mode: 0o600 });
 
     return {
         id: attachmentId,
@@ -45,14 +42,19 @@ export async function storeAttachment(
         type,
     };
 }
+function attachmentPath(filePath: string) {
+    const fullPath = resolve(DELTA_DATA_DIR, filePath);
+    if (!fullPath.startsWith(resolve(ATTACHMENTS_DIR) + sep)) throw new Error("Invalid attachment path.");
+    return fullPath;
+}
 export async function getAttachment(filePath: string): Promise<Buffer> {
-    const fullPath = join(DELTA_DATA_DIR, filePath);
+    const fullPath = attachmentPath(filePath);
     const fs = await import("fs/promises");
     return fs.readFile(fullPath);
 }
 
 export async function deleteAttachment(filePath: string): Promise<void> {
-    const fullPath = join(DELTA_DATA_DIR, filePath);
+    const fullPath = attachmentPath(filePath);
     const fs = await import("fs/promises");
     await fs.unlink(fullPath);
 }

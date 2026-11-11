@@ -1,122 +1,53 @@
-import React, { useState, useRef, useEffect, Key } from 'react';
-import { Copy, Download, Variable, RotateCw, SquarePen, Check, X, Settings, ChevronDown, ChevronUp } from 'lucide-react';
-import MarkdownWithSyntax from './MarkdownWithSyntax';
-import ChatInput from './ChatInput';
-import ImageModal from './ImageModal';
-import { Attachment, Message } from 'ai';
-import { Node, Edge } from '@xyflow/react';
-import { Response } from '../types/types';
+import React, { useState, useRef, useEffect } from "react";
+import { Copy, Download, Variable, RotateCw, SquarePen, Check, X, GitBranch } from "lucide-react";
+import MarkdownWithSyntax from "./MarkdownWithSyntax";
+import ChatInput from "./ChatInput";
+import ImageModal from "./ImageModal";
+import { ModelPicker } from "./ModelPicker";
+import type { Message } from "../../shared/contracts";
+import type { Node, Edge } from "@xyflow/react";
+import type { Response } from "../types/types";
 
-interface ChatInterfaceProps {
-  messages: Message[];
-  input: string;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleSubmit: (e?: { preventDefault: () => void }) => Promise<void>;
-  selectedModel: string;
-  setSelectedModel: (model: string) => void;
-  modelsByProvider: Record<string, string[]>;
-  onMessageClick: (message: any) => void;
-  temperature: number;
-  setTemperature: (temp: number) => void;
-  topP: number;
-  setTopP: (topP: number) => void;
-  onRegenerateClick: (message: any) => void;
-  onEditMessage: (message: any, newContent: string) => void;
-  droppedImages: string[];
-  setDroppedImages: (images: string[]) => void;
-  error?: Error;
-  chatTextareaRef: React.RefObject<HTMLTextAreaElement>;
-  setIsConfigModalOpen: (open: boolean) => void;
-  nodes: Node[];
-  edges: Edge[];
+interface Props {
+  messages: Message[]; input: string;
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  handleSubmit: (e?: { preventDefault(): void }) => Promise<void>;
+  selectedModel: string; setSelectedModel: (model: string) => void; modelsByProvider: Record<string, string[]>;
+  onMessageClick: (message: Message) => void;
+  temperature: number; setTemperature: (n: number) => void; topP: number; setTopP: (n: number) => void;
+  onRegenerateClick: (message: Message) => void; onEditMessage: (message: Message, content: string) => void;
+  droppedImages: string[]; setDroppedImages: React.Dispatch<React.SetStateAction<string[]>>;
+  error?: Error; chatTextareaRef: React.RefObject<HTMLTextAreaElement>; setIsConfigModalOpen: (value: boolean) => void;
+  nodes: Node[]; edges: Edge[]; isLoading: boolean; stop: () => void; retry: () => void;
+  modelErrors: Record<string, string>; refreshModels: () => Promise<void>; refreshingModels: boolean;
 }
-
-const DownloadMenu = ({
-  isOpen,
-  setIsOpen,
-  onDownloadChat,
-  onDownloadCanvas,
-  messages
-}: {
-  isOpen: boolean;
-  setIsOpen: (open: boolean) => void;
-  onDownloadChat: () => void;
-  onDownloadCanvas: () => void;
-  messages: Message[];
-}) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="flex flex-col gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
-      {messages.length > 0 && (
-        <button
-          onClick={onDownloadChat}
-          className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
-        >
-          Download Chat JSON
-        </button>
-      )}
-      <button
-        onClick={onDownloadCanvas}
-        className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
-      >
-        Download Canvas JSON
-      </button>
-    </div>
-  );
-};
-
 export default function ChatInterface({
-  messages,
-  input,
-  handleInputChange,
-  handleSubmit,
-  selectedModel,
-  setSelectedModel,
-  modelsByProvider,
-  onMessageClick,
-  temperature,
-  setTemperature,
-  topP,
-  setTopP,
-  onRegenerateClick,
-  onEditMessage,
-  droppedImages,
-  setDroppedImages,
-  error,
-  chatTextareaRef,
-  setIsConfigModalOpen,
-  nodes,
-  edges,
-}: ChatInterfaceProps) {
+  messages, input, handleInputChange, handleSubmit, selectedModel, setSelectedModel, modelsByProvider,
+  onMessageClick, temperature, setTemperature, topP, setTopP, onRegenerateClick, onEditMessage,
+  droppedImages, setDroppedImages, error, chatTextareaRef, setIsConfigModalOpen, nodes, edges,
+  isLoading, stop, retry, modelErrors, refreshModels, refreshingModels,
+}: Props) {
   const [showSettings, setShowSettings] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
-  const [isErrorExpanded, setIsErrorExpanded] = useState(false);
-
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  const [copied, setCopied] = useState("");
+  const scroll = useRef<HTMLDivElement>(null);
+  const pinned = useRef(true);
+  const menu = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    scrollToBottom();
-    setEditingMessageId(null);
+    if (pinned.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   }, [messages]);
-
   useEffect(() => {
-    if (editTextareaRef.current) {
-      editTextareaRef.current.focus();
-      editTextareaRef.current.setSelectionRange(editContent.length, editContent.length);
-      editTextareaRef.current.style.height = 'auto';
-      editTextareaRef.current.style.height = `${editTextareaRef.current.scrollHeight}px`;
-    }
-  }, [editingMessageId, editContent]);
-
+    const dismiss = (e: MouseEvent) => { if (!menu.current?.contains(e.target as HTMLElement)) setIsDownloadMenuOpen(false); };
+    document.addEventListener("mousedown", dismiss);
+    return () => document.removeEventListener("mousedown", dismiss);
+  }, []);
+  const copy = async (message: Message) => {
+    await navigator.clipboard.writeText(message.content);
+    setCopied(message.id); setTimeout(() => setCopied(""), 1200);
+  };
   const handleDownloadChat = () => {
     if (messages.length === 0) return;
 
@@ -192,303 +123,71 @@ export default function ChatInterface({
     URL.revokeObjectURL(url);
     setIsDownloadMenuOpen(false);
   };
-
-
-
-  return (
-    <div className="flex flex-col h-screen dark:bg-gray-900">
-      {error && (
-        <div className="bg-red-500/10 border border-red-500 text-red-500 dark:text-red-400 p-4 mx-4 mt-4 rounded-lg">
-          <div className="flex justify-between items-start">
-            <div>There was an error making the request. Please try again with another model.</div>
-            <button
-              onClick={() => setIsErrorExpanded(!isErrorExpanded)}
-              className="ml-2 p-1 hover:bg-red-500/20 rounded"
-            >
-              {isErrorExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
-          </div>
-          {isErrorExpanded && (
-            <div className="mt-2 p-2 bg-red-500/5 rounded overflow-x-auto text-sm">
-              {error.toString()}
-            </div>
-          )}
+  const submit = async (e: { preventDefault(): void }) => {
+    if (!input.trim() || isLoading || !selectedModel) { e.preventDefault(); return; }
+    pinned.current = true;
+    await handleSubmit(e);
+    setDroppedImages([]);
+  };
+  return <div className="flex flex-col h-screen bg-white dark:bg-gray-900 min-w-0">
+    <header className="h-14 shrink-0 flex items-center pl-12 pr-4 border-b border-gray-200 dark:border-gray-800 text-sm text-gray-500">
+      {messages.length ? "Conversation" : "New conversation"}
+    </header>
+    {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
+    <main ref={scroll} aria-label="Conversation" className="flex-1 min-h-0 overflow-y-auto p-5 space-y-6"
+      onScroll={e => { const el = e.currentTarget; pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
+      {!messages.length && <div className="h-full flex flex-col items-center justify-center text-center px-4">
+        <GitBranch size={28} className="text-gray-400 mb-4" />
+        <h1 className="text-lg font-medium">Explore a different direction</h1>
+        <p className="text-sm text-gray-500 mt-2 max-w-xs">Start a conversation, then branch from any response to try another idea or model.</p>
+        {!selectedModel && !refreshingModels && <button type="button" className="primary-button mt-5" onClick={() => setIsConfigModalOpen(true)}>Set Up a Provider</button>}
+      </div>}
+      {messages.map(message => <article key={message.id} className={`group flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}>
+        <div className={`max-w-full min-w-0 rounded-xl px-4 py-3 ${message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-800"}`}>
+          {editingMessageId === message.id ? <div>
+            <textarea aria-label="Edit Message" autoFocus className="w-full min-w-52 bg-transparent resize-y focus:outline-none" value={editContent} onChange={e => setEditContent(e.target.value)}
+              onKeyDown={e => { if (e.key === "Escape") setEditingMessageId(null); if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && editContent.trim()) { e.preventDefault(); onEditMessage(message, editContent); setEditingMessageId(null); } }} />
+            <div className="flex justify-end gap-2"><button type="button" title="Cancel Edit" onClick={() => setEditingMessageId(null)}><X size={16} /></button>
+              <button type="button" title="Branch with Edit" disabled={!editContent.trim()} onClick={() => { onEditMessage(message, editContent); setEditingMessageId(null); }}><Check size={16} /></button></div>
+          </div> : <div className="break-words text-sm leading-relaxed">
+            {message.experimental_attachments?.map((a, index) => <img key={index} src={a.url} alt={"Attachment " + (index + 1)} className="max-w-full max-h-60 rounded mb-2 cursor-pointer" onClick={() => setSelectedImage(a.url)} />)}
+            <MarkdownWithSyntax>{message.content || (isLoading ? "…" : "Response stopped.")}</MarkdownWithSyntax>
+          </div>}
         </div>
-      )}
-      {selectedImage && (
-        <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />
-      )}
-      <main className="flex-1 flex flex-col space-y-4 overflow-y-auto p-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full">
-        {messages.map((message: any, i: number) => (
-          <div
-            key={i}
-            className={`group flex items-start gap-2 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
-          >
-            <div className={`flex flex-col gap-1 ${editingMessageId === message.id ? '' : 'opacity-0 group-hover:opacity-100 transition-opacity'}`}>
-              {message.role === "assistant" && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRegenerateClick(message);
-                  }}
-                  className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-all text-gray-500 dark:text-gray-400"
-                >
-                  <RotateCw size={14} />
-                </button>
-              )}
-              {message.role === "user" && (
-                <>
-                  {!editingMessageId && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingMessageId(message.id);
-                        setEditContent(message.content);
-                      }}
-                      className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-all text-gray-500 dark:text-gray-400"
-                    >
-                      <SquarePen size={14} />
-                    </button>
-                  )}
-                  {editingMessageId === message.id && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEditMessage(message, editContent);
-                          setEditingMessageId(null);
-                        }}
-                        className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-all text-gray-500 dark:text-gray-400"
-                      >
-                        <Check size={14} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingMessageId(null);
-                        }}
-                        className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-all text-gray-500 dark:text-gray-400"
-                      >
-                        <X size={14} />
-                      </button>
-                    </>
-                  )}
-                </>
-              )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigator.clipboard.writeText(message.content);
-                }}
-                className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-all text-gray-500 dark:text-gray-400"
-              >
-                <Copy size={14} />
-              </button>
-            </div>
-
-            <div
-              onMouseUp={(e) => {
-                const selection = window.getSelection();
-                if (selection && selection.toString().trim().length > 0) {
-                  // Text was selected, do nothing
-                  return;
-                }
-                onMessageClick(message);
-              }}
-              style={{ cursor: 'pointer' }}
-              className={`max-w-[80%] rounded-2xl px-4 py-2 ${message.role === "user"
-                ? "bg-blue-500 text-white rounded-br-none"
-                : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-none"
-                }`}
-            >
-              {message.role === "user" && editingMessageId === message.id ? (
-                <textarea
-                  ref={editTextareaRef}
-                  value={editContent}
-                  onChange={(e) => {
-                    setEditContent(e.target.value);
-                    e.target.style.height = 'auto';
-                    e.target.style.height = e.target.scrollHeight + 'px';
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      onEditMessage(message, editContent);
-                      setEditingMessageId(null);
-                    }
-                    if (e.key === "Escape") {
-                      setEditingMessageId(null);
-                    }
-                  }}
-                  className="w-full min-w-[inherit] bg-transparent text-white placeholder-blue-200 focus:outline-none resize-none overflow-hidden"
-                />
-              ) : (
-                <div className="prose dark:prose-invert max-w-none prose-sm">
-                  {message.experimental_attachments?.map((attachment: Attachment, index: Key | null | undefined) => {
-                    return (
-                      <img
-                        key={index?.toString()}
-                        src={attachment.url}
-                        alt={`Attachment ${Number(index) + 1}`}
-                        className="max-w-full h-auto rounded-lg mb-2 cursor-pointer"
-                        onError={(e) => console.error('Image failed to load:', e)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedImage(attachment.url);
-                        }}
-                      />
-                    );
-                  })}
-                  <MarkdownWithSyntax>{message.content}</MarkdownWithSyntax>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </main>
-      <form onSubmit={(e) => handleSubmit(e)} className="flex flex-col gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
-
-        <div className="flex flex-col gap-2">
-          <div className="flex justify-between items-center">
-            {Object.keys(modelsByProvider).length === 0 ? (
-              <div
-                onClick={() => setIsConfigModalOpen(true)}
-                className="w-full text-center p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg text-yellow-800 dark:text-yellow-200 cursor-pointer hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors"
-              >
-                Click here to open <Settings className="inline-block align-text-bottom" size={16} /> and add API keys to enable models.
-              </div>
-            ) : (
-              <div className="flex gap-2 w-full">
-                <div className="flex-1 min-w-0"> {/* Add this wrapper */}
-                  <select
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="w-full rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-ellipsis overflow-hidden whitespace-nowrap"
-                  >
-                    {Object.entries(modelsByProvider).map(([provider, models]) => (
-                      <optgroup key={provider} label={provider}>
-                        {models.map((model) => (
-                          <option key={model} value={model} className="text-ellipsis overflow-hidden">
-                            {model}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex gap-2 ml-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowSettings(!showSettings)}
-                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center h-[40px] w-[40px] transition-all text-gray-700 dark:text-gray-300"
-                    title="Model Settings"
-                  >
-                    <Variable size={20} />
-                  </button>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsDownloadMenuOpen(!isDownloadMenuOpen)}
-                      className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center h-[40px] transition-all text-gray-700 dark:text-gray-300"
-                      title="Download Options"
-                    >
-                      <Download size={20} className="mr-1" />
-                      {isDownloadMenuOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          {isDownloadMenuOpen && (
-            <DownloadMenu
-              isOpen={isDownloadMenuOpen}
-              setIsOpen={setIsDownloadMenuOpen}
-              onDownloadChat={handleDownloadChat}
-              onDownloadCanvas={handleDownloadCanvas}
-              messages={messages}
-            />
-          )}
-          {showSettings && (
-            <div className="flex gap-4 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-              <div className="flex flex-col gap-2 flex-1">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm min-w-[80px] text-gray-700 dark:text-gray-300">Temperature</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={temperature}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value);
-                      if (!isNaN(value) && value >= 0 && value <= 1) {
-                        setTemperature(value);
-                      }
-                    }}
-                    className="flex-1"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={temperature}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value);
-                      if (!isNaN(value) && value >= 0 && value <= 1) {
-                        setTemperature(value);
-                      }
-                    }}
-                    className="w-16 px-1 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm min-w-[80px] text-gray-700 dark:text-gray-300">Top P</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={topP}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value);
-                      if (!isNaN(value) && value >= 0 && value <= 1) {
-                        setTopP(value);
-                      }
-                    }}
-                    className="flex-1"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={topP}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value);
-                      if (!isNaN(value) && value >= 0 && value <= 1) {
-                        setTopP(value);
-                      }
-                    }}
-                    className="w-16 px-1 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+        <div className="flex gap-1 mt-1 text-gray-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150">
+          <button type="button" className="message-action" title={copied === message.id ? "Copied" : "Copy Message"} onClick={() => void copy(message)}>{copied === message.id ? <Check size={14} /> : <Copy size={14} />}</button>
+          {message.role === "assistant" ? <>
+            <button type="button" className="message-action" title="Regenerate as Branch" disabled={isLoading} onClick={() => onRegenerateClick(message)}><RotateCw size={14} /></button>
+            <button type="button" className="message-action" title="Continue from Here" disabled={isLoading} onClick={() => { onMessageClick(message); chatTextareaRef.current?.focus(); }}><GitBranch size={14} /></button>
+          </> : <button type="button" className="message-action" title="Edit and Branch" disabled={isLoading} onClick={() => { setEditingMessageId(message.id); setEditContent(message.content); }}><SquarePen size={14} /></button>}
         </div>
-        <ChatInput
-          input={input}
-          handleInputChange={handleInputChange}
-          handleSubmit={handleSubmit}
-          textareaRef={chatTextareaRef}
-          droppedImages={droppedImages}
-          setDroppedImages={setDroppedImages}
-          disabled={Object.values(modelsByProvider).flat().length === 0}
-        />
-      </form>
-    </div>
-  );
+      </article>)}
+    </main>
+    {error && <div role="alert" className="mx-4 mb-3 p-3 text-sm rounded-lg bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300">
+      {error.message}<button type="button" className="underline ml-2" disabled={isLoading} onClick={retry}>Retry</button>
+    </div>}
+    <form onSubmit={submit} className="shrink-0 flex flex-col gap-3 p-4 border-t border-gray-200 dark:border-gray-800">
+      {Object.keys(modelErrors).length > 0 && <div className="text-xs text-amber-700 dark:text-amber-400" role="status">
+        {Object.entries(modelErrors).map(([provider, message]) => <div key={provider}>{provider}: {message}</div>)}
+      </div>}
+      <div className="flex items-center gap-2">
+        <ModelPicker selected={selectedModel} onSelect={setSelectedModel} models={modelsByProvider} refresh={refreshModels} refreshing={refreshingModels} disabled={isLoading} />
+        <button type="button" className="secondary-button !p-2" title="Model Settings" onClick={() => setShowSettings(!showSettings)}><Variable size={18} /></button>
+        <div ref={menu} className="relative" onKeyDown={e => { if (e.key === "Escape") setIsDownloadMenuOpen(false); }}>
+          <button type="button" className="secondary-button !p-2" title="Export Conversation" disabled={!messages.length} onClick={() => setIsDownloadMenuOpen(!isDownloadMenuOpen)}><Download size={18} /></button>
+          {isDownloadMenuOpen && <div className="absolute right-0 bottom-full mb-2 w-52 p-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-lg shadow-lg z-20 text-sm">
+            <button type="button" className="menu-item" onClick={handleDownloadChat}>Export Chat JSON</button>
+            <button type="button" className="menu-item" onClick={handleDownloadCanvas}>Export Obsidian Canvas</button>
+          </div>}
+        </div>
+      </div>
+      {showSettings && <div className="rounded-lg bg-gray-100 dark:bg-gray-800 p-3 text-sm space-y-2">
+        <label className="flex items-center justify-between gap-3">Temperature<input aria-label="Temperature" className="field !w-20 !mt-0" type="number" min="0" max="2" step="0.1" value={temperature} onChange={e => { const n = Number(e.target.value); if (n >= 0 && n <= 2) setTemperature(n); }} /></label>
+        <label className="flex items-center justify-between gap-3">Top P<input aria-label="Top P" className="field !w-20 !mt-0" type="number" min="0" max="1" step="0.05" value={topP} onChange={e => { const n = Number(e.target.value); if (n >= 0 && n <= 1) setTopP(n); }} /></label>
+        <p className="text-xs text-gray-500">Top P below 1 replaces temperature. Reasoning models may use their own sampling defaults.</p>
+      </div>}
+      <ChatInput input={input} handleInputChange={handleInputChange} handleSubmit={submit} textareaRef={chatTextareaRef}
+        droppedImages={droppedImages} setDroppedImages={setDroppedImages} disabled={!selectedModel} isLoading={isLoading} stop={stop} />
+    </form>
+  </div>;
 }

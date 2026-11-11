@@ -15,7 +15,6 @@ const ExpandableContent = ({
     content,
     attachments = [],
     isExpanded,
-    onToggle,
     className,
     showRaw = false,
 }: ExpandableContentProps) => {

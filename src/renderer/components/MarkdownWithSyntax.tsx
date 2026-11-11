@@ -20,7 +20,9 @@ const MarkdownWithSyntax = ({ children, showRaw = false }: MarkdownWithSyntaxPro
         <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
-                code: ({ node, className, children, ...props }) => {
+                a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer" className="underline">{children}</a>,
+                img: () => <span className="text-gray-500">[Remote image omitted]</span>,
+                code: ({ node: _node, className, children, ...props }) => {
                     const match = /language-(\w+)/.exec(className || '');
                     return match ? (
                         <SyntaxHighlighter
@@ -33,7 +35,7 @@ const MarkdownWithSyntax = ({ children, showRaw = false }: MarkdownWithSyntaxPro
                             {String(children).replace(/\n$/, '')}
                         </SyntaxHighlighter>
                     ) : (
-                        <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-sm" {...props}>
+                        <code className="bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded text-sm" {...props}>
                             {children}
                         </code>
                     );

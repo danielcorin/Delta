@@ -3,11 +3,11 @@ import dagre from "dagre";
 import { useCallback } from "react";
 
 export const FLOW_CONFIG = {
-    nodeWidth: 550,
-    nodeHeight: 150,
-    nodeSpacingX: 200,
-    nodeSpacingY: 250,
-    rankSeparation: 300,
+    nodeWidth: 420,
+    nodeHeight: 360,
+    nodeSpacingX: 70,
+    nodeSpacingY: 90,
+    rankSeparation: 90,
     edgeCurvature: 0.75,
 } as const;
 
@@ -73,7 +73,7 @@ export function useSpaceLayout() {
                 edges: edges.map((edge) => ({
                     ...edge,
                     type: "smoothstep",
-                    animated: true,
+                    animated: false,
                     style: {
                         stroke: "#555",
                         strokeWidth: 2,

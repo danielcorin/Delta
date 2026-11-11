@@ -1,4 +1,6 @@
-import { RunResult } from "better-sqlite3";
+import type { RunResult } from "better-sqlite3";
+import type { Settings } from "../../shared/contracts";
+export type { Settings } from "../../shared/contracts";
 
 export interface Attachment {
     id: string;
@@ -88,7 +90,7 @@ export interface SpaceProps {
 
     // Data fetching/updating
     fetchConversations: () => void;
-    fetchResponses: (conversationId: string) => void;
+    fetchResponses: (conversationId: string) => Promise<Response[]>;
     setResponses: (responses: Response[]) => void;
 
     // Model settings
@@ -102,8 +104,10 @@ export interface SpaceProps {
 
     // Settings
     settings: Settings;
-    updateProvider: (name: string, apiKey: string) => void;
     saveSettings: (settings: Settings) => Promise<boolean>;
+    modelErrors: Record<string, string>;
+    refreshModels: () => Promise<void>;
+    refreshingModels: boolean;
 }
 
 export interface ExpandedState {
@@ -111,13 +115,4 @@ export interface ExpandedState {
     response: boolean;
     promptRaw: boolean;
     responseRaw: boolean;
-}
-
-export interface ModelProvider {
-    name: string;
-    apiKey: string;
-}
-
-export interface Settings {
-    providers: ModelProvider[];
 }
