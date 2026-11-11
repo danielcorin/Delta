@@ -67,6 +67,12 @@ func leaf(x: CGFloat, y: CGFloat, angle: CGFloat, scale: CGFloat = 1) -> CGPath 
     var transform = CGAffineTransform(translationX: x, y: y).rotated(by: angle * .pi / 180).scaledBy(x: scale, y: scale)
     return path.copy(using: &transform)!
 }
+// Scale every layer together around the icon center, preserving proportions.
+func scaledGlyph(_ path: CGPath) -> CGPath {
+    var transform = CGAffineTransform(translationX: 512, y: 512)
+        .scaledBy(x: 1.10, y: 1.10).translatedBy(x: -512, y: -512)
+    return path.copy(using: &transform)!
+}
 let leaves = [
     leaf(x: 524, y: 232, angle: 13),
     leaf(x: 373, y: 264, angle: -28),
@@ -75,8 +81,8 @@ let leaves = [
     leaf(x: 729, y: 414, angle: 46),
     leaf(x: 358, y: 365, angle: -9, scale: 0.9),
     leaf(x: 642, y: 349, angle: -14, scale: 0.9),
-]
-let riverPaths = [river as CGPath] + branches
+].map(scaledGlyph)
+let riverPaths = ([river as CGPath] + branches).map(scaledGlyph)
 func drawGlyph(_ context: CGContext, in content: CGRect) {
     context.saveGState()
     context.translateBy(x: content.minX, y: content.maxY)
