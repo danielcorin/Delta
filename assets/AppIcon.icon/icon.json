@@ -2,13 +2,16 @@
   "fill-specializations" : [
     {
       "value" : {
-        "automatic-gradient" : "extended-srgb:0.18039,0.40784,0.47059,1.00000"
+        "linear-gradient" : [
+          "extended-srgb:0.96863,0.95686,0.93725,1.00000",
+          "extended-srgb:0.86667,0.85098,0.82353,1.00000"
+        ]
       }
     },
     {
       "appearance" : "dark",
       "value" : {
-        "automatic-gradient" : "extended-srgb:0.09020,0.22353,0.29412,1.00000"
+        "automatic-gradient" : "extended-srgb:0.14118,0.17647,0.20392,1.00000"
       }
     }
   ],
@@ -16,6 +19,31 @@
     {
       "layers" : [
         {
+          "fill-specializations" : [
+            {
+              "value" : {
+                "linear-gradient" : [
+                  "extended-srgb:0.20784,0.34118,0.41961,1.00000",
+                  "extended-srgb:0.09020,0.21569,0.29804,1.00000"
+                ]
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "linear-gradient" : [
+                  "extended-srgb:0.71373,0.78824,0.82353,1.00000",
+                  "extended-srgb:0.43137,0.58039,0.67451,1.00000"
+                ]
+              }
+            },
+            {
+              "appearance" : "tinted",
+              "value" : {
+                "solid" : "extended-gray:1,1"
+              }
+            }
+          ],
           "glass" : true,
           "image-name" : "river.svg",
           "name" : "River and branches"
@@ -36,6 +64,31 @@
     {
       "layers" : [
         {
+          "fill-specializations" : [
+            {
+              "value" : {
+                "linear-gradient" : [
+                  "extended-srgb:0.20784,0.34118,0.41961,1.00000",
+                  "extended-srgb:0.09020,0.21569,0.29804,1.00000"
+                ]
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "linear-gradient" : [
+                  "extended-srgb:0.71373,0.78824,0.82353,1.00000",
+                  "extended-srgb:0.43137,0.58039,0.67451,1.00000"
+                ]
+              }
+            },
+            {
+              "appearance" : "tinted",
+              "value" : {
+                "solid" : "extended-gray:1,1"
+              }
+            }
+          ],
           "glass" : true,
           "image-name" : "canopy.svg",
           "name" : "Glass leaves"

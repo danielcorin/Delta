@@ -15,9 +15,17 @@ func color(_ hex: UInt32) -> CGColor {
             green: CGFloat((hex >> 8) & 255) / 255,
             blue: CGFloat(hex & 255) / 255, alpha: 1)
 }
-let gradientTop = color(0x3B7C90)
-let gradientBottom = color(0x173E55)
-let white = color(0xFFFFFF)
+// Warm ivory and blue-black ink echo the original river/tree illustration.
+let ivoryTop: UInt32 = 0xF7F4EF
+let ivoryBottom: UInt32 = 0xDDD9D2
+let inkTop: UInt32 = 0x35576B
+let inkBottom: UInt32 = 0x17374C
+let gradientTop = color(ivoryTop)
+let gradientBottom = color(ivoryBottom)
+func iconColor(_ hex: UInt32) -> String {
+    String(format: "extended-srgb:%.5f,%.5f,%.5f,1.00000",
+           Double((hex >> 16) & 255) / 255, Double((hex >> 8) & 255) / 255, Double(hex & 255) / 255)
+}
 
 // Coordinates use SVG's top-left origin. The S-shaped river opens into a
 // delta/tree canopy, retaining the original icon's defining gesture.
@@ -73,7 +81,7 @@ func drawGlyph(_ context: CGContext, in content: CGRect) {
     context.saveGState()
     context.translateBy(x: content.minX, y: content.maxY)
     context.scaleBy(x: content.width / 1024, y: -content.height / 1024)
-    context.setFillColor(white)
+    context.setFillColor(color(inkBottom))
     for path in riverPaths + leaves { context.addPath(path); context.fillPath() }
     context.restoreGState()
 }
@@ -142,15 +150,23 @@ func writeSVG(_ paths: [CGPath], name: String) {
 writeSVG(riverPaths, name: "river")
 writeSVG(leaves, name: "canopy")
 func group(_ name: String, _ image: String, translucency: Double, shadow: Double) -> [String: Any] {
-    ["name": name, "layers": [["name": name, "image-name": image + ".svg", "glass": true]],
+    ["name": name, "layers": [[
+        "name": name, "image-name": image + ".svg", "glass": true,
+        // Keep the SVG mask white; apply the brand palette to the glass material.
+        "fill-specializations": [
+            ["value": ["linear-gradient": [iconColor(inkTop), iconColor(inkBottom)]]],
+            ["appearance": "dark", "value": ["linear-gradient": [iconColor(0xB6C9D2), iconColor(0x6E94AC)]]],
+            ["appearance": "tinted", "value": ["solid": "extended-gray:1,1"]],
+        ],
+    ]],
      "lighting": "combined", "specular": true,
      "shadow": ["kind": "neutral", "opacity": shadow],
      "translucency": ["enabled": true, "value": translucency]]
 }
 writeJSON([
     "fill-specializations": [
-        ["value": ["automatic-gradient": "extended-srgb:0.18039,0.40784,0.47059,1.00000"]],
-        ["appearance": "dark", "value": ["automatic-gradient": "extended-srgb:0.09020,0.22353,0.29412,1.00000"]],
+        ["value": ["linear-gradient": [iconColor(ivoryTop), iconColor(ivoryBottom)]]],
+        ["appearance": "dark", "value": ["automatic-gradient": iconColor(0x242D34)]],
     ],
     "groups": [group("River and branches", "river", translucency: 0.15, shadow: 0.25),
                group("Glass leaves", "canopy", translucency: 0.24, shadow: 0.30)],

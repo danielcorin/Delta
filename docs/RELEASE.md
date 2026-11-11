@@ -33,7 +33,7 @@ For a locally built Developer ID-signed app, `scripts/install.sh --development` 
 
 ## App icon
 
-The original river/tree becomes a white glass silhouette with a separate leaf layer over a blue-teal background. `assets/AppIcon.icon` is a real Icon Composer package, not a raster glass effect. macOS 26+ supplies its lighting and default/dark/tinted appearances; older systems use the compiled ICNS and legacy asset-catalog images.
+The original river/tree becomes a navy-blue glass silhouette with a separate leaf layer over a warm ivory background, retaining the original illustration’s palette. Dark mode uses slate blue glass on blue-black. `assets/AppIcon.icon` is a real Icon Composer package, not a raster glass effect. macOS 26+ supplies its lighting and default/dark/tinted appearances; older systems use the compiled ICNS and legacy asset-catalog images.
 
 Edit the shared geometry and palette in `scripts/generate-app-icon.swift`, then run `mise exec -- npm run icon:generate`. Commit the generated SVG, JSON, and PNG assets alongside the generator. `npm run icon:build` compiles them into `.cache/icon/` using actool. Every Forge package build does this automatically, bundles `Assets.car` and `AppIcon.icns` before signing, and verifies all three native appearances, both vector layers, the fallback, and the bundle icon keys. `npm run test:icon` repeats verification against the packaged app. `npm run icon:build -- --preview` also regenerates the README preview from Apple’s compiled fallback.
 
