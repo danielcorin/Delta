@@ -1,0 +1,60 @@
+{
+  "fill-specializations" : [
+    {
+      "value" : {
+        "automatic-gradient" : "extended-srgb:0.18039,0.40784,0.47059,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "automatic-gradient" : "extended-srgb:0.09020,0.22353,0.29412,1.00000"
+      }
+    }
+  ],
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "river.svg",
+          "name" : "River and branches"
+        }
+      ],
+      "lighting" : "combined",
+      "name" : "River and branches",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.25
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.14999999999999999
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "canopy.svg",
+          "name" : "Glass leaves"
+        }
+      ],
+      "lighting" : "combined",
+      "name" : "Glass leaves",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.29999999999999999
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.23999999999999999
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

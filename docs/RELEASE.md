@@ -2,7 +2,7 @@
 
 ## Local release
 
-Requirements: macOS, mise, Xcode Command Line Tools, GitHub CLI authentication, a Developer ID Application certificate with private key, and a notarytool Keychain profile.
+Requirements: macOS, mise, full Xcode 26 or newer selected with `xcode-select` (for the layered app icon), GitHub CLI authentication, a Developer ID Application certificate with private key, and a notarytool Keychain profile.
 
 The maintainer's signing identity is `Developer ID Application: wvlen LLC (93W5N4LQL7)`. The script uses the verified `DeltaNotary` Keychain profile. Notarization profiles belong to an Apple account/team, not an individual app. Override with `DEVELOPER_IDENTITY` and `NOTARY_PROFILE`. The profile name is configuration, not a credential. Use `xcrun notarytool store-credentials <profile>` interactively if setting up another machine. Never put passwords or exported signing keys in this repository.
 
@@ -30,6 +30,12 @@ Publish downloads and verifies the draft assets against the local checksums, req
 Use the DMG or ZIP from the draft for local testing. Keep the app signature intact. There is no need to remove quarantine or disable Gatekeeper.
 
 For a locally built Developer ID-signed app, `scripts/install.sh --development` installs it in `/Applications` without launching or changing the library. This explicit local-development mode skips notarization assessment; ordinary `scripts/install.sh` requires a notarized app. Neither mode disables Gatekeeper or changes quarantine attributes.
+
+## App icon
+
+The original river/tree becomes a white glass silhouette with a separate leaf layer over a blue-teal background. `assets/AppIcon.icon` is a real Icon Composer package, not a raster glass effect. macOS 26+ supplies its lighting and default/dark/tinted appearances; older systems use the compiled ICNS and legacy asset-catalog images.
+
+Edit the shared geometry and palette in `scripts/generate-app-icon.swift`, then run `mise exec -- npm run icon:generate`. Commit the generated SVG, JSON, and PNG assets alongside the generator. `npm run icon:build` compiles them into `.cache/icon/` using actool. Every Forge package build does this automatically, bundles `Assets.car` and `AppIcon.icns` before signing, and verifies all three native appearances, both vector layers, the fallback, and the bundle icon keys. `npm run test:icon` repeats verification against the packaged app. `npm run icon:build -- --preview` also regenerates the README preview from Apple’s compiled fallback.
 
 ## Architectures
 

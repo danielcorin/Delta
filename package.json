@@ -19,6 +19,9 @@
     "check": "npm run typecheck && npm run lint && npm test",
     "test:app": "playwright test",
     "test:package": "node scripts/smoke.mjs",
+    "icon:generate": "swift scripts/generate-app-icon.swift",
+    "icon:build": "bash scripts/build-icon.sh",
+    "test:icon": "node scripts/verify-icon.mjs",
     "release": "bash scripts/release.sh",
     "knex:migrate:make": "knex --knexfile knexfile.ts migrate:make --"
   },

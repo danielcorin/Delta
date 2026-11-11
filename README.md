@@ -75,6 +75,8 @@ mise exec -- npm run test:package   # launch the actual packaged executable
 mise exec -- npm audit
 ```
 
+Packaging requires full Xcode 26 or newer selected with `xcode-select` to compile the native Liquid Glass app icon. The packaged app still supports macOS 14+. See [icon generation and verification](docs/RELEASE.md#app-icon).
+
 Tests use temporary libraries and fake HTTP providers. They do not call paid APIs or read your Delta library. UI screenshots are written to `test-results/`. The package must be rebuilt after source changes before app tests.
 
 Knex owns the existing migration history in `src/main/migrations`. Migrations run before the window opens. Keep released migrations immutable; add a new migration for schema changes. The SQLite driver and vector extension are the only native runtime dependencies; frontend code and provider SDKs are bundled.
