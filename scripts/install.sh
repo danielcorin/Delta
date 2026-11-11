@@ -1,10 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+development=0
+if [[ "${1:-}" == --development ]]; then development=1; shift; fi
 app="${1:-out/Delta-darwin-$(node -p process.arch)/Delta.app}"
 [[ -d "$app" ]] || { echo "Build a release first: npm run release -- --prepare" >&2; exit 1; }
 codesign --verify --deep --strict "$app"
-spctl --assess --type execute "$app"
+if [[ "$development" == 1 ]]; then
+  codesign -dv --verbose=4 "$app" 2>&1 | grep -F "Authority=Developer ID Application:" >/dev/null
+else
+  spctl --assess --type execute "$app"
+fi
 if pgrep -f '^/Applications/Delta.app/Contents/MacOS/Delta' >/dev/null; then
   echo "Quit Delta before replacing the installed copy." >&2
   exit 1

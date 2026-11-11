@@ -4,7 +4,7 @@
 
 Requirements: macOS, mise, Xcode Command Line Tools, GitHub CLI authentication, a Developer ID Application certificate with private key, and a notarytool Keychain profile.
 
-The maintainer's existing signing identity is `Developer ID Application: wvlen LLC (93W5N4LQL7)` and profile is `RecoNotary`. Override with `DEVELOPER_IDENTITY` and `NOTARY_PROFILE`. The profile name is configuration, not a credential. Use `xcrun notarytool store-credentials <profile>` interactively if setting up another machine. Never put passwords or exported signing keys in this repository.
+The maintainer's signing identity is `Developer ID Application: wvlen LLC (93W5N4LQL7)`. The script expects a `DeltaNotary` profile, which must be provisioned before notarization. Override with `DEVELOPER_IDENTITY` and `NOTARY_PROFILE`. The profile name is configuration, not a credential. Use `xcrun notarytool store-credentials <profile>` interactively if setting up another machine. Never put passwords or exported signing keys in this repository.
 
 1. Update package.json's version, package-lock.json and `docs/releases/<version>.md`.
 2. Commit the finished release changes. The working tree must be clean.
@@ -28,6 +28,8 @@ mise exec -- npm run release -- --publish
 Publish downloads and verifies the draft assets against the local checksums, requires main to be an ancestor of the built commit, pushes that commit explicitly to main, updates the draft target to that commit, and publishes. It never force-pushes or silently rebuilds different source. If main has diverged, reconcile and prepare a new build.
 
 Use the DMG or ZIP from the draft for local testing. Keep the app signature intact. There is no need to remove quarantine or disable Gatekeeper.
+
+For a locally built Developer ID-signed app, `scripts/install.sh --development` installs it in `/Applications` without launching or changing the library. This explicit local-development mode skips notarization assessment; ordinary `scripts/install.sh` requires a notarized app. Neither mode disables Gatekeeper or changes quarantine attributes.
 
 ## Architectures
 

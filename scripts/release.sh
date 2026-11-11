@@ -6,7 +6,7 @@ version="$(node -p "require('./package.json').version")"
 tag="v$version"
 arch="${RELEASE_ARCH:-$(node -p process.arch)}"
 repo="${GH_REPO:-danielcorin/Delta}"
-profile="${NOTARY_PROFILE:-RecoNotary}"
+profile="${NOTARY_PROFILE:-DeltaNotary}"
 identity="${DEVELOPER_IDENTITY:-Developer ID Application: wvlen LLC (93W5N4LQL7)}"
 output="$PWD/release/$version"
 app="$PWD/out/Delta-darwin-$arch/Delta.app"
@@ -77,6 +77,7 @@ case "$mode" in
       # the exact manifest commit only after a fast-forward source push succeeds.
       gh release create "$tag" --repo "$repo" --draft --target main --title "Delta $version" --notes-file "docs/releases/$version.md"
     fi
+    gh release edit "$tag" --repo "$repo" --title "Delta $version" --notes-file "docs/releases/$version.md"
     gh release upload "$tag" --repo "$repo" --clobber "$output/Delta-$version-$arch.zip" "$output/Delta-$version-$arch.dmg" "$output/Delta-$version-source.tar.gz" "$output/manifest.json" "$output/SHA256SUMS"
     gh release view "$tag" --repo "$repo" --json url,isDraft
     ;;
