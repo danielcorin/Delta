@@ -7,7 +7,8 @@ export default function NodeContent({ nodeId, response, expanded, setExpandedNod
   setExpandedNodes: Dispatch<SetStateAction<Record<string, ExpandedState>>>; onDelete: (id: string) => void;
 }) {
   const toggle = (field: keyof ExpandedState) => setExpandedNodes(prev => ({ ...prev, [nodeId]: { ...expanded, [field]: !expanded[field] } }));
-  return <div className="text-left text-gray-900 dark:text-gray-100" onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onDelete(nodeId); }}>
+  // React Flow must leave wheel gestures to this scroller and its nested code blocks.
+  return <div className="nowheel text-left text-gray-900 dark:text-gray-100" onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onDelete(nodeId); }}>
     {(["prompt", "response"] as const).map(part => <div key={part} className={`group p-3 ${part === "prompt" ? "bg-blue-50 dark:bg-blue-950/40 border-b border-gray-200 dark:border-gray-700" : "bg-white dark:bg-gray-800"}`}>
       <div className="flex justify-between gap-3 items-center mb-2">
         <span className="text-xs text-gray-500 break-all">{part === "prompt" ? "You" : response.model}</span>

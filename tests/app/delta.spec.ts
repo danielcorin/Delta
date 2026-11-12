@@ -10,6 +10,8 @@ let app: ElectronApplication, page: Page, server: Server, home: string;
 let port: number;
 const requests: { url: string; body: any }[] = [];
 const errors: string[] = [];
+const scrollFixture = "# Scroll regression\n\n```text\n" + "wide code content ".repeat(30) + "\n```\n\n" +
+  Array.from({ length: 30 }, (_, i) => `Paragraph ${i + 1}: scroll this conversation turn without moving or zooming the canvas.`).join("\n\n");
 test.beforeAll(async () => {
   home = await mkdtemp(path.join(os.tmpdir(), "delta-e2e-"));
   server = createServer(async (req, res) => {
@@ -23,6 +25,9 @@ test.beforeAll(async () => {
       id: "fixture-response", object: "chat.completion.chunk", created: 1, model: input.model,
       choices: [{ index: 0, delta: { content }, finish_reason: finish }],
     }) + "\n\n");
+    if (input.messages.at(-1).content === scrollFixture) {
+      chunk(scrollFixture, "stop"); res.end("data: [DONE]\n\n"); return;
+    }
     chunk("A branching conversation ");
     if (input.messages.at(-1).content === "slow") {
       const timer = setInterval(() => chunk("continues "), 100);
@@ -170,5 +175,65 @@ test("chat, branching, cancellation, settings, search, backup and screenshots", 
   const zoomed = await app.evaluate(async ({ BrowserWindow }) => (await BrowserWindow.getAllWindows()[0].capturePage()).toPNG().toString("base64"));
   await writeFile("test-results/delta-large-text.png", Buffer.from(zoomed, "base64"));
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(errors.filter(e => !e.includes("net::ERR_CONNECTION_REFUSED"))).toEqual([]);
+});
+
+test("wheel scrolling stays inside a node and its code blocks, including at the boundaries", async () => {
+  await page.reload();
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    window.webContents.setZoomFactor(1); window.setSize(1280, 800);
+  });
+  await expect(page.getByRole("button", { name: "Choose Model" })).toContainText(/fixture/);
+  await page.getByRole("textbox", { name: "Message", exact: true }).fill(scrollFixture);
+  await page.getByRole("button", { name: "Send Message" }).click();
+  await expect(page.getByRole("button", { name: "Stop Response" })).toHaveCount(0);
+  const node = page.locator(".react-flow__node").first();
+  await expect(node).toContainText("Paragraph 30");
+  await node.getByTitle("Expand Text").first().click();
+  const scroller = node.locator(":scope > .text-left");
+  await expect.poll(() => scroller.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(500);
+  const viewport = page.locator(".react-flow__viewport");
+  const transform = await viewport.getAttribute("style");
+  const wheel = async (x: number, y: number) => {
+    const handled = page.evaluate(() => new Promise<void>(resolve => document.addEventListener("wheel", () => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }, { once: true, capture: true })));
+    await page.mouse.wheel(x, y);
+    await handled;
+  };
+
+  // Native horizontal scrolling in a nested fenced code block.
+  const code = node.locator("pre > div").first();
+  await expect.poll(() => code.evaluate(el => el.scrollWidth - el.clientWidth)).toBeGreaterThan(100);
+  await code.hover();
+  await wheel(200, 0);
+  await expect.poll(() => code.evaluate(el => el.scrollLeft)).toBeGreaterThan(0);
+  await expect(viewport).toHaveAttribute("style", transform!);
+
+  // Wheel over rendered prose scrolls the node, not the graph.
+  await scroller.hover({ position: { x: 20, y: 280 } });
+  await wheel(0, 250);
+  await expect.poll(() => scroller.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await expect(viewport).toHaveAttribute("style", transform!);
+  await page.screenshot({ path: "test-results/delta-node-scroll.png" });
+
+  // Momentum at the bottom must not suddenly zoom the canvas; reverse still works.
+  await scroller.evaluate(el => { el.scrollTop = el.scrollHeight; });
+  const bottom = await scroller.evaluate(el => el.scrollTop);
+  await wheel(0, 250);
+  await expect(viewport).toHaveAttribute("style", transform!);
+  await wheel(0, -200);
+  await expect.poll(() => scroller.evaluate(el => el.scrollTop)).toBeLessThan(bottom);
+  await expect(viewport).toHaveAttribute("style", transform!);
+  await scroller.evaluate(el => { el.scrollTop = 0; });
+  await wheel(0, -250);
+  await expect(viewport).toHaveAttribute("style", transform!);
+
+  // The canvas's usual wheel-to-zoom behavior is unchanged outside a node.
+  const canvas = page.getByRole("region", { name: "Conversation Canvas" });
+  await canvas.hover({ position: { x: 80, y: 100 } });
+  await wheel(0, 150);
+  await expect(viewport).not.toHaveAttribute("style", transform!);
   expect(errors.filter(e => !e.includes("net::ERR_CONNECTION_REFUSED"))).toEqual([]);
 });
