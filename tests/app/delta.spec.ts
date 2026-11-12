@@ -178,7 +178,7 @@ test("chat, branching, cancellation, settings, search, backup and screenshots", 
   expect(errors.filter(e => !e.includes("net::ERR_CONNECTION_REFUSED"))).toEqual([]);
 });
 
-test("wheel scrolling stays inside a node and its code blocks, including at the boundaries", async () => {
+test("wheel scrolling uses the canvas for collapsed nodes and content for expanded nodes", async () => {
   await page.reload();
   await app.evaluate(({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows()[0];
@@ -190,11 +190,8 @@ test("wheel scrolling stays inside a node and its code blocks, including at the 
   await expect(page.getByRole("button", { name: "Stop Response" })).toHaveCount(0);
   const node = page.locator(".react-flow__node").first();
   await expect(node).toContainText("Paragraph 30");
-  await node.getByTitle("Expand Text").first().click();
   const scroller = node.locator(":scope > .text-left");
-  await expect.poll(() => scroller.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(500);
   const viewport = page.locator(".react-flow__viewport");
-  const transform = await viewport.getAttribute("style");
   const wheel = async (x: number, y: number) => {
     const handled = page.evaluate(() => new Promise<void>(resolve => document.addEventListener("wheel", () => {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
@@ -202,6 +199,19 @@ test("wheel scrolling stays inside a node and its code blocks, including at the 
     await page.mouse.wheel(x, y);
     await handled;
   };
+
+  // Collapsed previews pass wheel gestures to the canvas, even over their content.
+  const expectCanvasScroll = async () => {
+    const before = await viewport.getAttribute("style");
+    await scroller.hover();
+    await wheel(0, 80);
+    await expect(viewport).not.toHaveAttribute("style", before!);
+    expect(await scroller.evaluate(el => el.scrollTop)).toBe(0);
+  };
+  await expectCanvasScroll();
+  await node.getByTitle("Expand Text").first().click();
+  await expect.poll(() => scroller.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(500);
+  const transform = await viewport.getAttribute("style");
 
   // Native horizontal scrolling in a nested fenced code block.
   const code = node.locator("pre > div").first();
@@ -230,10 +240,28 @@ test("wheel scrolling stays inside a node and its code blocks, including at the 
   await wheel(0, -250);
   await expect(viewport).toHaveAttribute("style", transform!);
 
+  // Expanding either part is enough: collapsing the prompt while the response
+  // remains expanded must still keep wheel gestures inside the node.
+  await node.getByTitle("Expand Text").nth(1).click();
+  await node.getByTitle("Expand Text").first().click();
+  await scroller.evaluate(el => { el.scrollTop = 0; });
+  await scroller.hover({ position: { x: 20, y: 180 } });
+  await wheel(0, 250);
+  await expect.poll(() => scroller.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await expect(viewport).toHaveAttribute("style", transform!);
+
+  // Collapsing the last expanded part hands scrolling back to the canvas.
+  await node.getByTitle("Expand Text").nth(1).click();
+  await expectCanvasScroll();
+  // Showing Markdown source does not itself count as expanding the node.
+  await node.getByTitle("Toggle Markdown Source").first().click();
+  await expectCanvasScroll();
+
   // The canvas's usual wheel-to-zoom behavior is unchanged outside a node.
   const canvas = page.getByRole("region", { name: "Conversation Canvas" });
   await canvas.hover({ position: { x: 80, y: 100 } });
+  const beforeCanvasScroll = await viewport.getAttribute("style");
   await wheel(0, 150);
-  await expect(viewport).not.toHaveAttribute("style", transform!);
+  await expect(viewport).not.toHaveAttribute("style", beforeCanvasScroll!);
   expect(errors.filter(e => !e.includes("net::ERR_CONNECTION_REFUSED"))).toEqual([]);
 });
