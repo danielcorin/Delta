@@ -11,7 +11,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel]
+        # Liquid Glass compilation and assetutil inspection need the macOS 26 runtime.
+        runner: [macos-26, macos-26-intel]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4

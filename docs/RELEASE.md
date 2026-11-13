@@ -2,7 +2,7 @@
 
 ## Local release
 
-Requirements: macOS, mise, full Xcode 26 or newer selected with `xcode-select` (for the layered app icon), GitHub CLI authentication, a Developer ID Application certificate with private key, and a notarytool Keychain profile.
+Requirements: a macOS 26 or newer build host, mise, full Xcode 26 or newer selected with `xcode-select` (for the layered app icon), GitHub CLI authentication, a Developer ID Application certificate with private key, and a notarytool Keychain profile.
 
 The maintainer's signing identity is `Developer ID Application: wvlen LLC (93W5N4LQL7)`. The script uses the verified `DeltaNotary` Keychain profile. Notarization profiles belong to an Apple account/team, not an individual app. Override with `DEVELOPER_IDENTITY` and `NOTARY_PROFILE`. The profile name is configuration, not a credential. Use `xcrun notarytool store-credentials <profile>` interactively if setting up another machine. Never put passwords or exported signing keys in this repository.
 
@@ -51,7 +51,7 @@ sqlite-vec 0.1.9's macOS binary requires macOS 14. Do not lower the app's docume
 
 ## GitHub Actions
 
-`check.yml` runs checks, packages and tests on hosted Apple silicon and Intel macOS runners and uploads unsigned CI ZIPs plus UI verification artifacts. These ZIPs are development artifacts, not notarized releases.
+`check.yml` runs checks, packages and tests on hosted Apple silicon (`macos-26`) and Intel (`macos-26-intel`) runners. macOS 26 is required on the build host because both the icon compiler and asset inspector depend on its Liquid Glass runtime; installing Xcode 26 on macOS 15 is insufficient. The app's minimum deployment target remains macOS 14. CI and uploads unsigned CI ZIPs plus UI verification artifacts. These ZIPs are development artifacts, not notarized releases.
 
 `release.yml` is manually dispatched and uses the same local release script. It intentionally keeps signing keys off GitHub-hosted machines. It requires a dedicated self-hosted runner labeled `macOS`, `ARM64`, `delta-release`, with the signing identity/notary profile available and an approved `release` environment. Registering that persistent runner is an explicit operator setup step; none was installed during this revival. Do not run untrusted pull requests on that runner.
 

@@ -3,7 +3,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 root="$PWD"
 output="$root/.cache/icon"
-[[ "$(uname)" == Darwin ]] || { echo "Liquid Glass icons require macOS and Xcode 26+." >&2; exit 1; }
+[[ "$(uname)" == Darwin ]] || { echo "Liquid Glass icons require macOS 26+ and Xcode 26+." >&2; exit 1; }
+host_version="$(sw_vers -productVersion)"
+[[ "${host_version%%.*}" -ge 26 ]] || { echo "Packaging requires a macOS 26+ build host for Liquid Glass compilation and inspection (found $host_version). The app still supports macOS 14+." >&2; exit 1; }
 version="$(xcrun xcodebuild -version | awk '/^Xcode / {print $2}')"
 [[ "${version%%.*}" -ge 26 ]] || { echo "Select full Xcode 26+ with xcode-select; Command Line Tools alone cannot compile .icon packages." >&2; exit 1; }
 mkdir -p "$output"

@@ -75,7 +75,7 @@ mise exec -- npm run test:package   # launch the actual packaged executable
 mise exec -- npm audit
 ```
 
-Packaging requires full Xcode 26 or newer selected with `xcode-select` to compile the native Liquid Glass app icon. The packaged app still supports macOS 14+. See [icon generation and verification](docs/RELEASE.md#app-icon).
+Packaging requires a macOS 26 or newer build host and full Xcode 26 or newer selected with `xcode-select` to compile the native Liquid Glass app icon. The packaged app still supports macOS 14+. See [icon generation and verification](docs/RELEASE.md#app-icon).
 
 Tests use temporary libraries and fake HTTP providers. They do not call paid APIs or read your Delta library. UI screenshots are written to `test-results/`. The package must be rebuilt after source changes before app tests.
 
