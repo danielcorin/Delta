@@ -61,6 +61,7 @@ Until a signing runner is registered, the local commands above are the complete 
 
 - 26 boundary tests: migration idempotence, SQLite/FTS/Unicode search, subtree and conversation deletion, offline combined search, credential migration/failure safety, secret redaction, endpoint validation, pagination and provider protocol streaming.
 - Electron end-to-end: model search, image paste, send, root-edit branching, cancellation with persisted partial response, configured Ollama URL, provider error handling, search navigation, settings in chat-only mode, secret storage, full-library export and backup integrity.
+- Electron scrolling regression: collapsed nodes pass wheel gestures to the canvas; expanded prompts/responses scroll their content and nested code blocks without moving the canvas, including at scroll boundaries and after collapsing again.
 - Screenshots: light/dark, reduced motion, compact window and enlarged text.
 - Signed executable smoke: fresh library startup, SQLite vector extension, renderer/preload bridge.
 - npm audit: zero known vulnerabilities at preparation time.
